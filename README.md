@@ -15,8 +15,10 @@ personal data.
 
 ## Why CertiLayer
 
-- **No PII, ever.** No names, emails, or identifiers are captured — only
-  behavioral patterns (typing rhythm, mouse velocity, scroll depth,
+- **No PII, by design.** Typed content is never captured. The keyboard
+  collector records timing only (typing rhythm), never which keys were
+  pressed. Password, email, phone and card fields are ignored entirely.
+  The rest is behavioral patterns (mouse velocity, scroll depth,
   navigation timing).
 - **Passive.** No challenges, no puzzles, no friction for real users.
 - **Tiny footprint.** Under 20KB, pure DOM/browser APIs, no runtime
@@ -65,6 +67,29 @@ server-to-server calls) and must never be embedded in frontend code.
 The SDK enforces this at runtime: calling `init()` with a key that starts
 with `certilayer_live_sk_` throws immediately instead of silently leaking
 the key to the browser.
+
+---
+
+## Next.js (App Router)
+
+Run `init()` in a client component only, never during SSR. Keep the
+instance and call `getSessionId()` on it (the global `CertiLayer` object
+exists only with the script tag).
+
+```tsx
+'use client'
+import { useEffect } from 'react'
+import { init, showBadge } from '@certilayer/web'
+
+export function CertiLayerProvider() {
+  useEffect(() => {
+    const cl = init({ apiKey: process.env.NEXT_PUBLIC_CERTILAYER_PK! })
+    showBadge({ position: 'bottom-right' })
+    return () => { void cl.stop() }
+  }, [])
+  return null
+}
+```
 
 ---
 
@@ -162,14 +187,34 @@ Four signal types, all behavioral — never content:
 
 | Signal       | What's recorded                                                      |
 | ------------ | ---------------------------------------------------------------------- |
-| `keyboard`   | Inter-key interval and dwell time per keystroke — **not** which keys were pressed as content |
+| `keyboard`   | Inter-key interval and dwell time per keystroke, plus a boolean for Backspace (error-correction rate). **Key identity is never recorded.** |
 | `mouse`      | Position, velocity, and click duration                                 |
 | `scroll`     | Delta, velocity, and page-depth ratio                                  |
 | `navigation` | SPA route transitions and time spent per route                        |
 
 Signals are batched, converted into a 34-dimension feature vector
 client-side, and sent to your CertiLayer ingestion endpoint — raw signals
-are retained only for audit purposes.
+are retained only for audit purposes. Keyboard signals contain timing only; see [Privacy](#privacy).
+
+---
+
+## Privacy
+
+- **No key identity.** `event.key` and `event.code` are never placed in
+  any payload. Each keystroke yields only dwell time, inter-key interval,
+  and a Backspace flag.
+- **Sensitive fields are skipped entirely:** `input[type=password]`,
+  `type=email`, `type=tel`, `autocomplete=cc-*`,
+  `autocomplete=one-time-code`.
+- **Opt any element out** by adding `data-certilayer-ignore` to it or to
+  an ancestor:
+
+```html
+  <form data-certilayer-ignore> ... </form>
+```
+
+- **Upgrade note:** versions before 1.3.5 sent key values from regular
+  text fields. Upgrade to 1.3.6 or later.
 
 ---
 
