@@ -23,8 +23,8 @@ describe('computeFeatureVector', () => {
 
   it('sets keyboard_present (fv[0]) when keyboard signals exist', () => {
     const signals: RawSignal[] = [
-      { kind: 'keyboard', ts_ms: 0,   data: { code: 'KeyA', down_ts: 0,   up_ts: 0,  iki_ms: 0 } },
-      { kind: 'keyboard', ts_ms: 200, data: { code: 'KeyB', down_ts: 200, up_ts: 0,  iki_ms: 200 } },
+      { kind: 'keyboard', ts_ms: 0,   data: { backspace: false, down_ts: 0,   up_ts: 0,  iki_ms: 0 } },
+      { kind: 'keyboard', ts_ms: 200, data: { backspace: false, down_ts: 200, up_ts: 0,  iki_ms: 200 } },
     ];
     const fv = computeFeatureVector(signals, 1000);
     expect(fv[0]).toBe(1); // keyboard_present
@@ -67,7 +67,7 @@ describe('computeFeatureVector', () => {
 
   it('touch/motion features (fv[20-28]) always stay 0 on web', () => {
     const signals: RawSignal[] = [
-      { kind: 'keyboard', ts_ms: 0, data: { code: 'KeyA', down_ts: 0, up_ts: 0, iki_ms: 0 } },
+      { kind: 'keyboard', ts_ms: 0, data: { backspace: false, down_ts: 0, up_ts: 0, iki_ms: 0 } },
     ];
     const fv = computeFeatureVector(signals, 1000);
     for (let i = 20; i <= 28; i++) expect(fv[i]).toBe(0);

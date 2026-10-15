@@ -1,16 +1,31 @@
 // Layer:  L1 -- Web SDK
 // File:   capture/keyboard.ts
-// Role:   Captures keyboard events — keydown/keyup timing for IKI + dwell.
-//         Never captures key values for sensitive fields (password, email).
+// Role:   Captures keyboard TIMING only (IKI + dwell).
+//         Key identity (e.key / e.code) is never placed in any emitted payload.
+//         Sensitive fields are skipped entirely.
 // Author: Youssef Emad
 
 import { RawSignal, KeyboardSignal } from '../types';
 import { nowMs } from '../utils/time';
 
-/** Sensitive input types — never capture key values from these. */
-const SENSITIVE_TYPES = new Set(['password', 'email', 'tel', 'credit-card']);
+/** Fields we never observe at all. */
+const SENSITIVE_SELECTOR = [
+  'input[type="password"]',
+  'input[type="email"]',
+  'input[type="tel"]',
+  'input[autocomplete^="cc-"]',
+  'input[autocomplete="one-time-code"]',
+  '[data-certilayer-ignore]',
+].join(',');
 
-/** Track keydown timestamps per key for dwell time calculation. */
+function isSensitive(t: EventTarget | null): boolean {
+  return t instanceof Element && t.closest(SENSITIVE_SELECTOR) !== null;
+}
+
+/**
+ * In-memory only, used to pair keydown with keyup for dwell time.
+ * The map key is never emitted or stored anywhere.
+ */
 const keyDownTimes = new Map<string, number>();
 
 /** Timestamp of the previous keydown event for IKI calculation. */
@@ -23,14 +38,7 @@ let emitter: Emitter | null = null;
 
 /** Handler for keydown events. */
 function onKeyDown(e: KeyboardEvent): void {
-  if (!emitter) return;
-
-  const target = e.target as HTMLInputElement | null;
-  const inputType = target?.type ?? '';
-
-  // Never capture key identity from sensitive fields
-  const key  = SENSITIVE_TYPES.has(inputType) ? '[redacted]' : e.key;
-  const code = SENSITIVE_TYPES.has(inputType) ? '[redacted]' : e.code;
+  if (!emitter || isSensitive(e.target)) return;
 
   const ts  = nowMs();
   const iki = lastKeyDownTs === 0 ? 0 : ts - lastKeyDownTs;
@@ -39,11 +47,10 @@ function onKeyDown(e: KeyboardEvent): void {
   lastKeyDownTs = ts;
 
   const payload: KeyboardSignal = {
-    key,
-    code,
-    down_ts:     ts,
-    up_ts:       0,
-    iki_ms:      iki,
+    backspace: e.key === 'Backspace', // boolean only, for error-correction rate
+    down_ts:   ts,
+    up_ts:     0,
+    iki_ms:    iki,
   };
 
   emitter({ kind: 'keyboard', ts_ms: ts, data: payload as unknown as Record<string, unknown> });
@@ -55,15 +62,14 @@ function onKeyUp(e: KeyboardEvent): void {
 
   const downTs = keyDownTimes.get(e.code);
   if (downTs === undefined) return;
-
-  const ts = nowMs();
   keyDownTimes.delete(e.code);
 
-  // Emit a dwell update — same key, now with up_ts filled
+  if (isSensitive(e.target)) return;
+
+  const ts = nowMs();
   const payload: Partial<KeyboardSignal> = {
-    code:   e.code,
-    up_ts:  ts,
     down_ts: downTs,
+    up_ts:   ts,
   };
 
   emitter({ kind: 'keyboard', ts_ms: ts, data: payload as Record<string, unknown> });

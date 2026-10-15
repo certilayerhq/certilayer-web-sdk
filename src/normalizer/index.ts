@@ -187,7 +187,7 @@ function extractKeyboardFeatures(kb: RawSignal[], fv: number[]): void {
 
   // ── Error correction rate (Backspace events / total key events) ───────────
   const backspaces = downEvents.filter(s =>
-    (s.data as unknown as KeyboardSignal).code === 'Backspace'
+    (s.data as unknown as KeyboardSignal).backspace === true
   ).length;
   fv[10] = downEvents.length > 0 ? backspaces / downEvents.length : 0;
 }

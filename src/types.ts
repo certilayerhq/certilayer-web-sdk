@@ -31,10 +31,9 @@ export interface RawSignal {
   data:  Record<string, unknown>
 }
 
-/** Keyboard event signal — IKI + dwell time, no sensitive key values */
+/** Keyboard event signal — timing only. Never contains key identity. */
 export interface KeyboardSignal {
-  key:     string
-  code:    string
+  backspace: boolean
   down_ts: number
   up_ts:   number
   iki_ms:  number
